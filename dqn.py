@@ -7,7 +7,7 @@ import random
 from collections import deque
 
 # environment
-env = gym.make("CartPole-v1", render_mode="human") # creates the env
+env = gym.make("CartPole-v1", render_mode="rgb_array") # creates the env
 
 # dqn
 class DQN(nn.Module): # subclasses nn.Module
@@ -48,14 +48,41 @@ def select_action(state, epsilon): # selects an action (random or not based on e
     if random.random() < epsilon: # random for epsilon*100 percent of the time
         return env.action_space.sample() # explores
     else:
-        state = torch.FloatTensor(state).unsqueeze(0) # adds dimension of size 1 
+        state = torch.FloatTensor(state).unsqueeze(0) # adds dimension of size 1 at position 0
         q_values = critic(state) # gets the q values for the current state from the critic
         return torch.argmax(q_values).item() # exploits
 
+def optimize_model():
+    if len(memory) < batch_size: # if the memory is smaller than batch size then it wont optimize
+        return
+
+    # TODO: custom memory class 
+    batch = random.sample(memory, batch_size) # randomly samples a batch of batch_size from the memory
+    state_batch, action_batch, reward_batch, next_batch, done_batch = zip(*batch)
+
+    # turn everything into tensors
+    state_batch = torch.tensor(np.array(state_batch), dtype=torch.float32) 
+    action_batch = torch.LongTensor(action_batch).unsqueeze(1) # adds dimension but this time at position 1
+    reward_batch = torch.FloatTensor(reward_batch) 
+    next_batch = torch.tensor(np.array(next_batch), dtype=torch.float32)
+    done_batch = torch.FloatTensor(done_batch)
+
+    q_values = critic(state_batch).gather(1, action_batch).squeeze() # predicts q-values for all actions and extracts value of action actually taken
+
+    with torch.no_grad(): # does not remember operations   
+        max_next_q_values = critic(next_batch).max(1)[0] # outputs best possible q-value from next state
+        target_q_values = reward_batch + gamma * max_next_q_values * (1-done_batch) # calculates immediate reward and future estimated reward
+    
+    loss = nn.MSELoss()(q_values, target_q_values) # calculates distance from predicated q-values to target q-value
+
+    optimizer.zero_grad() # clears old gradients
+    loss.backward() # computes gradients of loss w.r.t. model parameters
+    optimizer.step() # updatse network weights 
+
 # training loop
 rewards = [] # rewards for each episode
-steps = 0 # number of training(?) steps taken
-for episode in range(5): # runs five episodes
+steps = 0 # number of training steps taken
+for episode in range(episodes): # runs five episodes
     state, info = env.reset() # resets environment
     episode_reward = 0 # sets current reward to 0
 
@@ -66,7 +93,17 @@ for episode in range(5): # runs five episodes
         action = select_action(state, epsilon) # picks action based on current state and epsilon
         next, reward, terminated, truncated, info = env.step(action) # gets the feedback from the environment
 
+        memory.append((state, action, reward, next, terminated or truncated)) # add step to memory
+
         state = next # updates current state
         episode_reward += reward # adds step reward to episode reward
 
+        optimize_model()
+
+        steps += 1
+    
+    epsilon = max(epsilon_min, epsilon_decay * epsilon) # decays epsilon
+
     rewards.append(episode_reward) # adds episode reward to rewards list
+
+# TODO testing loop
