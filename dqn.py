@@ -26,7 +26,7 @@ class DQN(nn.Module): # subclasses nn.Module
         return x
 
 # memory
-Transition = namedtuple('Transition', ['state', 'action', 'next_state', 'reward', 'done'])
+Transition = namedtuple('Transition', ['state', 'action', 'reward', 'next_state', 'done'])
 class Memory(object): 
     def __init__(self, memory_size): # initializes the memory as a deque with a given max size 
         self.memory = deque([], maxlen=memory_size)
@@ -40,7 +40,7 @@ class Memory(object):
 
         # turn everything into tensors
         state_batch = torch.tensor(np.array(state_batch), dtype=torch.float32) 
-        action_batch = torch.LongTensor(action_batch).unsqueeze(1) # adds dimension but this time at position 1
+        action_batch = torch.LongTensor(action_batch).unsqueeze(1)
         reward_batch = torch.FloatTensor(reward_batch) 
         next_state_batch = torch.tensor(np.array(next_state_batch), dtype=torch.float32)
         done_batch = torch.FloatTensor(done_batch)
@@ -60,6 +60,8 @@ batch_size = 64 # number of transitions sampled from replay buffer
 memory_size = 10000 # number of transitions stored for sampling
 episodes = 1000 # episodes to train
 tau = 0.005 # update rate of target network
+verbose = 1 # training info printing
+log_interval = 100 # interval of training steps to print info
 
 # q-network initialization
 input_dimensions = env.observation_space.shape[0] # based off the shape of the environment (4 for cart pole)
@@ -94,17 +96,24 @@ def optimize_model():
         target_q_values = reward_batch + gamma * max_next_q_values * (1-done_batch) # calculates immediate reward and future estimated reward
     
     loss = nn.MSELoss()(q_values, target_q_values) # calculates distance from predicated q-values to target q-value
+    global last_loss
+    last_loss = loss.item()
 
     optimizer.zero_grad() # clears old gradients
     loss.backward() # computes gradients of loss w.r.t. model parameters
     optimizer.step() # updatse network weights 
 
-# training loop TODO print info
+def average(data, window=log_interval):
+    return sum(data[-window:])/window
+
+# training loop
 rewards = [] # rewards for each episode
+lengths = [] # lengths for each episode
 steps = 0 # number of training steps taken
-for episode in range(episodes): # runs five episodes
+for episode in range(episodes): # runs given number of episodes
     state, info = env.reset() # resets environment
     episode_reward = 0 # sets current reward to 0
+    episode_length = steps
 
     terminated = False 
     truncated = False
@@ -127,10 +136,15 @@ for episode in range(episodes): # runs five episodes
             target_state_dict[key] = critic_state_dict[key]*tau + target_state_dict[key]*(1-tau)
         target.load_state_dict(target_state_dict)
 
+        if verbose == 1 and steps%log_interval == 0 and steps != 0:
+            print(f"------------- \nstep: {steps} \nepisode: {episode} \navg length: {average(lengths)} \navg reward: {average(rewards)} \nloss: {last_loss} \nepsilon: {epsilon}")
+
         steps += 1
     
     epsilon = max(epsilon_min, epsilon_decay * epsilon) # decays epsilon
 
+    episode_length = steps - episode_length # calculates length of current episode
+    lengths.append(episode_length) # adds episode length to lengths list
     rewards.append(episode_reward) # adds episode reward to rewards list
 
 # TODO testing loop
