@@ -11,5 +11,6 @@ tau = 0.005 # update rate of target network
 verbose = 1 # training info printing
 log_interval = 10 # interval of episodes to print info
 
+# do not change unless changing environment
 input_dimensions = 4 # based off the shape of the environment (4 for cart pole)
 output_dimensions = 2 # based off the number of action spaces of the environment (2 for cart pole)
