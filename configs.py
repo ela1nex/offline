@@ -6,10 +6,10 @@ epsilon_min = 0.01 # ending epsilon value
 epsilon_decay = 0.99 # epsilon decay rate
 batch_size = 64 # number of transitions sampled from replay buffer
 memory_size = 10000 # number of transitions stored for sampling
-episodes = 500 # episodes to train
+training_steps = 100000 # steps to train
 tau = 0.005 # update rate of target network
 verbose = 1 # training info printing (0 is no info, 1 is info)
-log_interval = 10 # interval of episodes to print info
+log_interval = 1000 # interval of episodes to print info
 
 imagination_rollout_length = 2 # number of rollouts done for the imaginated buffer
 
