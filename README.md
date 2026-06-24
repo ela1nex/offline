@@ -10,8 +10,8 @@ built with pytorch and tested on the cartpole environment from gymnasium.
 - dynamic implementation for model-based planning
 
 # preview
-![regular (no dynamic)](regular.gif) regular <br>
-![dynamic](dynamic.gif) dynamic
+regular: ![regular (no dynamic)](regular.gif) <br>
+dynamic: ![dynamic](output.gif)
 trained w default configs
 
 ## how 2 use
