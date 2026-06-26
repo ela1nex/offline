@@ -16,14 +16,13 @@ env   = gym.make("CartPole-v1")
 agent = Agent()
 
 # load offline dataset
-dataset = minari.load_dataset("cartpole/expert-v0")
+dataset = minari.load_dataset("cartpole/expert-v5")
 
 print("Loading offline dataset …")
 total_terminations = 0
 for episode in dataset.iterate_episodes():
     for i in range(len(episode.rewards)):
-        # fix 4: use truncations as done signal if terminations are all zero
-        done = bool(episode.terminations[i])
+        done = bool(episode.terminations[i]) or bool(episode.truncations[i])
         agent.memory.push(
             episode.observations[i],
             episode.actions[i],
@@ -32,6 +31,12 @@ for episode in dataset.iterate_episodes():
             done,
         )
         total_terminations += int(done)
+
+episode_lengths = []
+for ep in dataset.iterate_episodes():
+    episode_lengths.append(len(ep.rewards))
+
+print(f"min: {min(episode_lengths)}, max: {max(episode_lengths)}, mean: {sum(episode_lengths)/len(episode_lengths):.1f}")
 
 print(f"replay buffer size : {len(agent.memory)} transitions")
 print(f"total done signals : {total_terminations}")
