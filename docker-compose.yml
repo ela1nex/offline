@@ -1,0 +1,6 @@
+services:
+  sparq:
+    build: .
+    volumes:
+      - .:/app
+    command: sh -c "python train.py && python test.py"

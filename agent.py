@@ -30,53 +30,31 @@ class Agent():
             return torch.argmax(q_values).item() # exploits
 
     def optimize_model(self):
-        if len(self.memory) < batch_size: # if the memory is smaller than batch size then it wont optimize
+        if len(self.memory) < batch_size:
             return 0.0, 0.0
-        self.imagined_memory.clear() # memory for dynamic training
 
-        state_batch, action_batch, reward_batch, next_state_batch, done_batch = self.memory.sample(batch_size) # randomly samples a batch of batch_size from the memory
+        state_batch, action_batch, reward_batch, next_state_batch, done_batch = self.memory.sample(batch_size)
 
-        state_action_batch = torch.cat((state_batch, action_batch.float()), dim=1) # concatenates state and action batches
-        dynamic_output = self.dynamic(state_action_batch) # get the predicted reward, next state, and done from dynamic network
-        dynamic_reward = dynamic_output[:, 0] # extract predicted reward
-        dynamic_next_state = dynamic_output[:, 1:1+input_dimensions] # extract predicted next state
-        dynamic_done = dynamic_output[:, -1] # extract predicted done
-        
-        dynamic_loss = nn.MSELoss()(dynamic_reward, reward_batch) + nn.MSELoss()(dynamic_next_state, next_state_batch) + nn.BCEWithLogitsLoss()(dynamic_done, done_batch) # calculates loss for dynamic network
-        last_dynamic_loss = dynamic_loss.item()
+        # Q-values for taken actions
+        all_q_values = self.critic(state_batch)
+        q_values = all_q_values.gather(1, action_batch).squeeze(1)
 
-        self.dynamic_optimizer.zero_grad()
-        dynamic_loss.backward()
-        self.dynamic_optimizer.step()
-        
-        # collect rollouts from current state batch
-        self.imagine(state_batch)
-        
-        # use both imagined and real data for training critic
-        half = batch_size // 2
-        r_state, r_action, r_reward, r_next_state, r_done = self.memory.sample(half)
-        i_state, i_action, i_reward, i_next_state, i_done = self.imagined_memory.sample(half)
-        d_state_batch = torch.cat([r_state, i_state])
-        d_action_batch = torch.cat([r_action, i_action])
-        d_reward_batch = torch.cat([r_reward, i_reward])
-        d_next_state_batch = torch.cat([r_next_state, i_next_state])
-        d_done_batch = torch.cat([r_done, i_done])
-        
-        # train critic on new data TODO n-step truncation
-        q_values = self.critic(d_state_batch).gather(1, d_action_batch).squeeze() # predicts q-values for all actions and extracts value of action actually taken
+        with torch.no_grad():
+            max_next_q_values = self.target(next_state_batch).max(1)[0]
+            target_q_values = reward_batch + gamma * max_next_q_values * (1 - done_batch)
 
-        with torch.no_grad(): # does not remember operations
-            max_next_q_values = self.target(d_next_state_batch).max(1)[0] # outputs best possible q-value from next state
-            target_q_values = d_reward_batch + gamma * max_next_q_values * (1-d_done_batch) # calculates immediate reward and future estimated reward
-        
-        critic_loss = nn.MSELoss()(q_values, target_q_values) # calculates distance from predicated q-values to target q-value
-        last_critic_loss = critic_loss.item()
+        logsumexp = torch.logsumexp(all_q_values, dim=1).mean()
+        dataset_q = q_values.mean()
+        cql_penalty = logsumexp - dataset_q
 
-        self.critic_optimizer.zero_grad() # clears old gradients
-        critic_loss.backward() # computes gradients of loss w.r.t. model parameters
-        self.critic_optimizer.step() # updatse network weights 
+        alpha = 0.5
+        critic_loss = nn.MSELoss()(q_values, target_q_values) + alpha * cql_penalty
 
-        return last_critic_loss, last_dynamic_loss
+        self.critic_optimizer.zero_grad()
+        critic_loss.backward()
+        self.critic_optimizer.step()
+
+        return critic_loss.item(), cql_penalty
 
     # dynamic model 
     def dynamic_step(self, state, action):
