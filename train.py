@@ -9,6 +9,8 @@ def average(data, window=10): # averages last ten episodes
     window = min(len(data), window)
     return sum(data[-window:])/window
 
+training_steps = 10000 # dont train all the way for more diversity in samples
+
 # environment
 env = gym.make("CartPole-v1", max_episode_steps=500) # creates the env
 
@@ -67,5 +69,5 @@ while steps < training_steps: # runs given number of steps
 
     epsilon = max(epsilon_min, epsilon - epsilon_decay_per_step)
 
-torch.save(agent.critic.state_dict(), "critic.pth")
-torch.save(agent.dynamic.state_dict(), "dynamic.pth")
+torch.save(agent.critic.state_dict(), "critic_med.pth")
+torch.save(agent.dynamic.state_dict(), "dynamic_med.pth")

@@ -6,7 +6,7 @@ from agent import *
 
 agent = Agent()
 
-agent.critic.load_state_dict(torch.load("critic.pth"))
+agent.critic.load_state_dict(torch.load("offline_critic.pth"))
 agent.critic.eval()
 # agent.dynamic.load_state_dict(torch.load("dynamic.pth"))
 # agent.dynamic.eval()

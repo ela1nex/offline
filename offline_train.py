@@ -16,9 +16,14 @@ env   = gym.make("CartPole-v1")
 agent = Agent()
 
 # load offline dataset
-dataset = minari.load_dataset("cartpole/expert-v5")
+path1 = "cartpole/expert-v7"
+path2 = "cartpole/medium-v0"
+dataset1 = minari.load_dataset(path1)
+dataset2 = minari.load_dataset(path2)
 
-print("Loading offline dataset …")
+dataset = minari.combine_datasets(datasets_to_combine=[dataset1, dataset2], new_dataset_id="cartpole/expert-medium-v0")
+
+print(f"Loading offline dataset … {path1} and {path2}")
 total_terminations = 0
 for episode in dataset.iterate_episodes():
     for i in range(len(episode.rewards)):
